@@ -120,13 +120,10 @@ streaming) que partilha o mesmo modelo e os mesmos sinks — usado para a
 
 ## Configuração
 
-Variáveis de ambiente (definir antes do kernel arrancar, se necessário):
+Parâmetros definidos como variáveis no topo de cada notebook:
 
-| Variável          | Default                                                     |
-| ----------------- | ----------------------------------------------------------- |
-| `KAFKA_BOOTSTRAP` | `10.84.129.52:9092`                                         |
-| `KAFKA_TOPIC`     | `transactions`                                              |
-| `SPARK_KAFKA_PKG` | `org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0`          |
+- `HDFS_BASE` — namenode + diretório do projeto.
+- `KAFKA_BOOTSTRAP` e `KAFKA_TOPIC` — nos dois notebooks Kafka.
 
-Caminhos HDFS estão hardcoded em `HDFS_BASE` no topo de cada notebook —
-ajustar se mudar de cluster.
+O conector `spark-sql-kafka-0-10` é assumido como disponível no classpath do
+cluster Spark (instalação típica em `$SPARK_HOME/jars/`).
