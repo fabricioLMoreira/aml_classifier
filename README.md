@@ -21,7 +21,7 @@ combinando treino batch e classificação em streaming.
                                        predictions/ (parquet)     │
               ┌───────────────────────────────────────────────────┘
               │ OFFLINE (batch SQL / Hive)
-              │  predictions/ + dim_banks ──► Stats Processor ──► KPIs
+              │  predictions/ + dim_accounts ──► Stats Processor ──► KPIs
               └───────────────────────────────────────────────────
 ```
 
@@ -34,10 +34,12 @@ streaming) que partilha o mesmo modelo e os mesmos sinks — usado para a
 1. **Dados em HDFS.** `LI-Small_Trans.csv` (treino) e `LI-Medium_Trans.csv`
    (simulação de stream) em `/aulas/fabricio_moreira/project/dataset/`.
 
-2. **Tabela de dimensão derivada (multi-fonte).** `aml_stats.ipynb` constrói
-   `dim_banks` a partir dos `bank_id` distintos das transações, enriquecida com
-   nome, país e tier (sintéticos), e persiste em `/dim/banks/` como parquet.
-   Cria a segunda fonte que se cruza com a tabela de factos.
+2. **Tabela de dimensão (multi-fonte).** `aml_stats.ipynb` constrói
+   `dim_accounts` pela união dos ficheiros `LI-Small_accounts.csv` e
+   `LI-Medium_accounts.csv`, deduplicada por `(bank_id, account_number)` e com
+   `entity_type` derivado por regex sobre `entity_name`. Persiste em
+   `/dim/accounts/` como parquet. É a segunda fonte que se cruza com a
+   tabela de factos das transações.
 
 3. **Treino offline batch (Spark MLlib).** `aml_trainer.ipynb` lê o Small, faz
    feature engineering (log dos montantes, diferença, flags `same_bank` /
@@ -52,9 +54,9 @@ streaming) que partilha o mesmo modelo e os mesmos sinks — usado para a
 5. **Producer envia transações em streaming simulado.** Dois producers em
    paralelo:
    - `aml_kafka_producer.ipynb`: serializa cada linha em JSON e envia em
-     rajadas para o tópico Kafka `transactions`, com `sleep` entre rajadas.
+     batches para o tópico Kafka `transactions`, com `sleep` entre batches.
    - `aml_file_producer.ipynb`: escreve CSVs em `/stream/input/`, também em
-     rajadas com delay.
+     batches com delay.
 
 6. **Camada de transporte:** Kafka (broker) **ou** pasta HDFS (file source) —
    duas alternativas com o mesmo processamento, para a análise comparativa.
@@ -68,19 +70,21 @@ streaming) que partilha o mesmo modelo e os mesmos sinks — usado para a
 
 8. **Consumer mostra no console** com coluna `status`:
    `"BLOQUEADA - suspeita de fraude"` ou `"OK - fidedigna"`, junto com
-   `From Bank`, `To Bank`, `Account2`, `Amount Paid` e `prob_fraud`.
+   `From Bank`, `To Bank`, `From Account`, `Amount Paid` e `prob_fraud`.
 
 9. **Consumer grava resultados em Parquet** particionado por hora de ingestão
    em `/stream/predictions_kafka/` (e `/stream/predictions_file/` para o
    caminho file-based). Em paralelo escreve janelas de 30s com contagens em
    `/stream/metrics_*/` para o benchmark.
 
-10. **Processor batch — KPIs e SQL ad-hoc.** `aml_stats.ipynb` lê as previsões
-    de ambas as fontes (union), junta com `dim_banks` e produz: total de
-    transações, fidedignas vs suspeitas (n e %), valor total e valor suspeito,
-    fraude por banco, fraude por país, top contas suspeitas. Por fim regista
-    **tabelas externas Hive** sobre os parquets para queries SQL puras —
-    fecha o requisito "Spark, MapReduce, Hive, ..." do enunciado.
+10. **Processor batch — KPIs e SQL ad-hoc (últimos 7 dias).** `aml_stats.ipynb`
+    lê as previsões de ambas as fontes (union), **filtra à janela dos últimos
+    7 dias** relativa a `MAX(Timestamp)` nas previsões, junta com `dim_accounts`
+    e produz: total de transações, fidedignas vs suspeitas (n e %), valor total
+    e valor suspeito, fraude por banco real, fraude por tipo de entidade (PF
+    vs PJ), top contas suspeitas. Por fim regista **tabelas externas Hive**
+    sobre os parquets para queries SQL puras — fecha o requisito "Spark,
+    MapReduce, Hive, ..." do enunciado.
 
 11. **Benchmark comparativo.** `aml_benchmark.ipynb` compara Kafka vs
     file-based em throughput (msgs/s) e qualidade
@@ -102,12 +106,12 @@ streaming) que partilha o mesmo modelo e os mesmos sinks — usado para a
 | 1. Dados em HDFS                                          | HDFS                                            | ✓                                         |
 | 2. Treino do modelo no Small                              | `aml_trainer.ipynb`                             | ✓                                         |
 | 3. Modelo disponível                                      | `model/` em HDFS                                | ✓                                         |
-| 4. Producer envia transações                              | `aml_kafka_producer` + `aml_file_producer`      | ✓ em rajadas, não row-by-row              |
+| 4. Producer envia transações                              | `aml_kafka_producer` + `aml_file_producer`      | ✓ em batches, não row-by-row              |
 | 5. Camada de transporte                                   | Kafka **e** pasta HDFS (ambos)                  | dois caminhos paralelos                   |
 | 6 + 7. Consumer recebe e classifica                       | `aml_*_consumer.ipynb`                          | fundidos num único Spark job              |
 | 8. Print de "fidedigna / suspeita"                        | sink consola com coluna `status`                | ✓                                         |
 | 9. Resultados em ficheiro                                 | `predictions_*/` em parquet                     | ✓ não CSV (parquet é colunar / Hive-able) |
-| 10. Estatísticas a partir dos resultados                  | `aml_stats.ipynb`                               | ✓ + `dim_banks` + tabelas Hive            |
+| 10. Estatísticas a partir dos resultados                  | `aml_stats.ipynb`                               | ✓ + `dim_accounts` + tabelas Hive            |
 
 ## Como correr (ordem para a defesa)
 
