@@ -79,12 +79,13 @@ streaming) que partilha o mesmo modelo e os mesmos sinks — usado para a
 
 10. **Processor batch — KPIs e SQL ad-hoc (últimos 7 dias).** `aml_stats.ipynb`
     lê as previsões de ambas as fontes (union), **filtra à janela dos últimos
-    7 dias** relativa a `MAX(Timestamp)` nas previsões, junta com `dim_accounts`
-    e produz: total de transações, fidedignas vs suspeitas (n e %), valor total
-    e valor suspeito, fraude por banco real, fraude por tipo de entidade (PF
-    vs PJ), top contas suspeitas. Por fim regista **tabelas externas Hive**
-    sobre os parquets para queries SQL puras — fecha o requisito "Spark,
-    MapReduce, Hive, ..." do enunciado.
+    7 dias por `ingest_ts`** (ingest time, relativa a `current_timestamp()` —
+    distinto de `Timestamp` que é event time fixo no dataset de 2022), junta
+    com `dim_accounts` e produz: total de transações, fidedignas vs suspeitas
+    (n e %), valor total e valor suspeito, fraude por banco real, fraude por
+    tipo de entidade (PF vs PJ), top contas suspeitas. Por fim regista
+    **tabelas externas Hive** sobre os parquets para queries SQL puras —
+    fecha o requisito "Spark, MapReduce, Hive, ..." do enunciado.
 
 11. **Benchmark comparativo.** `aml_benchmark.ipynb` compara Kafka vs
     file-based em throughput (msgs/s) e qualidade
