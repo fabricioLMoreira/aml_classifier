@@ -1,0 +1,10 @@
+hdfs_path=hdfs://10.84.129.52:9000/trab/g12
+hdfs_data_small=${hdfs_path}/dataset/LI-Small_Trans.csv
+hdfs_data_medium=${hdfs_path}/dataset/LI-Small_Medium.csv
+
+hdfs_model=${hdfs_path}/model/rf_aml_pipeline
+hdfs_stream=${hdfs_path}/stream
+hdfs_dim=${hdfs_path}/dim
+
+hive_uri=jdbc:hive2://10.84.128.48:10000
+spark_uri=jdbc:hive2://10.84.129.48:10000
