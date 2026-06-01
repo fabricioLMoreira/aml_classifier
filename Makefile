@@ -3,17 +3,9 @@ include config
 help: ## Show this help.
 	@sed -ne '/@sed/!s/## //p' $(MAKEFILE_LIST)
 
-hdfs-create-folders: ## Create HDFS folders
-	hdfs dfs -rm -f -R ${hdfs_model} 
-	hdfs dfs -mkdir -p ${hdfs_model}
-
-	hdfs dfs -rm -f -R ${hdfs_stream} 
+hdfs-cleanUp-stream: ## Clean up and create HDFS stream folder
+	hdfs dfs -rm -f -R ${hdfs_stream}
 	hdfs dfs -mkdir -p ${hdfs_stream}
-
-	hdfs dfs -rm -f -R ${hdfs_dim} 
-	hdfs dfs -mkdir -p ${hdfs_dim}/accounts
-
-	hdfs dfs -ls ${hdfs_path} 
 
 ipynb2py: ## Convert .ipynb files to .py files
 	jupyter nbconvert --to script aml_trainer.ipynb
