@@ -93,6 +93,81 @@ combinando treino batch e classificação em streaming.
 | `aml_kafka_consumer.ipynb`     | streaming consumer | Kafka → modelo → parquet de previsões         |
 | `aml_stats.ipynb`              | batch              | `dim_accounts`, KPIs 7d, tabelas Hive externas |
 | `aml_benchmark.ipynb`          | batch              | Qualidade, throughput, comparação Small/Medium |
+| `aml_auto_trainer.py`          | serviço (loop)     | Retreino automático/periódico do modelo em HDFS |
+
+## Treino automático e periódico
+
+Para manter o modelo atualizado sem o correr à mão, o `aml_trainer.ipynb` continua
+a ser a única implementação do algoritmo de treino. Antes de executar, os
+notebooks são convertidos para `.py` (`make ipynb2py`); o `aml_auto_trainer.py`
+apenas decide quando chamar o `aml_trainer.py` gerado.
+
+1. **Producer com dual-write.** `aml_kafka_producer.ipynb` passa a gravar cada
+   batch em HDFS (`training/incremental/`, Parquet com label) **além** de o
+   enviar para Kafka. É a fonte de dados novos para o retreino.
+
+2. **Auto-trainer.** `aml_auto_trainer.py` faz polling de
+   `training/incremental/` e, quando acumulam `RETRAIN_THRESHOLD` (default 5000)
+   novas linhas desde o último treino, chama `spark-submit aml_trainer.py` com
+   `AML_INCLUDE_INCREMENTAL=1`. O `aml_trainer.py` gerado pelo notebook retreina
+   com o dataset base (`Small`) + todos os incrementais. O polling lê apenas um contador
+   (`training/manifests/_counter.json`, atualizado pelo producer a cada batch) —
+   evita um `spark.count()` sobre todo o Parquet a cada ciclo (custo O(1), sem
+   jobs Spark e sem o ruído de `TaskKilled`/broadcast).
+
+3. **Publicação atómica e versionada.** O modelo é gravado primeiro em
+   `model/versions/rf_aml_pipeline_<timestamp>/`, depois atualiza o
+   `model/rf_aml_pipeline` (legacy) e só no fim publica o ponteiro
+   `model/active_model.json` (path + métricas + contagens). Evita que o consumer
+   carregue um modelo a meio da escrita.
+
+4. **Consumer com hot-reload.** `aml_kafka_consumer.ipynb` usa `foreachBatch` e,
+   a cada micro-batch, lê `active_model.json` e recarrega o `PipelineModel` só se
+   a versão mudou — as previsões passam a usar o modelo mais recente sem reiniciar
+   o job.
+
+Correr (serviço de longa duração, parar com Ctrl-C):
+
+```
+make auto-trainer        # converte notebooks e executa python aml_auto_trainer.py
+```
+
+Parâmetros (env ou `config`): `AML_RETRAIN_THRESHOLD`, `AML_POLL_INTERVAL`
+(default 10s), `AML_HDFS_BASE`, `AML_SPARK_MASTER`.
+
+### Comportamento durante o retreino
+
+Enquanto o `aml_trainer.py` chamado pelo `aml_auto_trainer.py` está a treinar um
+novo modelo, o sistema não descarta dados:
+
+- O producer continua a enviar mensagens para Kafka e a gravar os mesmos batches
+  em `training/incremental/`.
+- O consumer continua ativo e classifica os micro-batches com o modelo atualmente
+  publicado.
+- O novo modelo só fica visível depois de o treino terminar e o ficheiro
+  `model/active_model.json` ser atualizado.
+
+O retreino usa o dataset base (`LI-Small_Trans.csv`) mais os dados incrementais
+que o Spark encontra em `training/incremental/` no momento da leitura. Dados que
+chegam enquanto o treino já está a decorrer ficam persistidos em HDFS e serão
+considerados no retreino seguinte. Pode existir uma pequena diferença temporal
+entre o contador lido antes do treino e os ficheiros Parquet efetivamente lidos,
+mas isso não perde dados; no pior caso algumas linhas entram num treino e ainda
+contam para o próximo ciclo.
+
+### Hot-reload do modelo no consumer
+
+O consumer usa `foreachBatch`. Em cada micro-batch chama `get_active_model()`:
+
+- lê `model/active_model.json` em HDFS;
+- compara o `model_path` publicado com o modelo atualmente em memória;
+- se o path mudou, carrega o novo `PipelineModel`;
+- se o path não mudou, reutiliza o modelo já carregado.
+
+A troca de modelo acontece entre micro-batches, nunca a meio de um batch. Por
+exemplo: se o batch 20 começou com o modelo A e o auto-trainer publica o modelo
+B durante esse processamento, o batch 20 termina com o modelo A; o batch 21 lê o
+novo `active_model.json`, carrega o modelo B e passa a usá-lo.
 
 ## Mapeamento à proposta inicial
 
@@ -110,11 +185,13 @@ combinando treino batch e classificação em streaming.
 
 ## Como correr (ordem para a defesa)
 
-1. **`aml_trainer.ipynb`** — uma vez, treino offline.
+1. **`aml_trainer.ipynb`** — uma vez, treino offline (baseline inicial).
 2. Janelas separadas (deixar consumer arrancar primeiro):
    - `aml_kafka_consumer.ipynb` → depois `aml_kafka_producer.ipynb`
-3. **`aml_stats.ipynb`** — KPIs de negócio + tabelas Hive.
-4. **`aml_benchmark.ipynb`** — qualidade + throughput + Small vs Medium.
+3. **`aml_auto_trainer.py`** (`make auto-trainer`) — opcional, em paralelo:
+   retreina o modelo automaticamente à medida que o producer alimenta o HDFS.
+4. **`aml_stats.ipynb`** — KPIs de negócio + tabelas Hive.
+5. **`aml_benchmark.ipynb`** — qualidade + throughput + Small vs Medium.
 
 ## Configuração
 

@@ -3,8 +3,15 @@ hdfs_data_small=${hdfs_path}/dataset/LI-Small_Trans.csv
 hdfs_data_medium=${hdfs_path}/dataset/LI-Small_Medium.csv
 
 hdfs_model=${hdfs_path}/model/rf_aml_pipeline
+hdfs_model_versions=${hdfs_path}/model/versions
+hdfs_active_model=${hdfs_path}/model/active_model.json
 hdfs_stream=${hdfs_path}/stream
 hdfs_dim=${hdfs_path}/dim
+hdfs_incremental=${hdfs_path}/training/incremental
+hdfs_manifests=${hdfs_path}/training/manifests
+
+retrain_threshold=2000
+poll_interval=10
 
 hive_uri=jdbc:hive2://10.84.128.48:10000
 spark_uri=jdbc:hive2://10.84.129.48:10000
