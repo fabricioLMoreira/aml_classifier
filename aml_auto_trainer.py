@@ -1,19 +1,3 @@
-"""
-AML Auto Trainer — orchestrator only.
-
-This script does not implement any ML training logic. The single source of truth
-for the model algorithm is `aml_trainer.ipynb`, converted to `aml_trainer.py`
-before execution.
-
-Responsibilities:
-  1. Poll the producer-maintained HDFS counter (`training/manifests/_counter.json`).
-  2. Read `model/active_model.json` to know how many incremental rows were used
-     in the last published model.
-  3. When the threshold is reached, run `spark-submit aml_trainer.py` with
-     environment variables that enable incremental training and active model
-     publication.
-"""
-
 import json
 import os
 import subprocess
