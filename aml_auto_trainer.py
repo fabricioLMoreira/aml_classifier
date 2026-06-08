@@ -4,24 +4,14 @@ import subprocess
 import time
 
 
-HDFS_BASE = os.environ.get(
-    "AML_HDFS_BASE", "hdfs://10.84.129.52:9000/trab/g12"
-)
+HDFS_BASE = os.environ.get("AML_HDFS_BASE", "hdfs://10.84.129.52:9000/trab/g12")
 SPARK_MASTER = os.environ.get("AML_SPARK_MASTER", "spark://10.84.128.47:7077")
 
-INCREMENTAL_PATH = os.environ.get(
-    "AML_INCREMENTAL_PATH", f"{HDFS_BASE}/training/incremental"
-)
-COUNTER_PATH = os.environ.get(
-    "AML_COUNTER_PATH", f"{HDFS_BASE}/training/manifests/_counter.json"
-)
-ACTIVE_MODEL_PATH = os.environ.get(
-    "AML_ACTIVE_MODEL_PATH", f"{HDFS_BASE}/model/active_model.json"
-)
+INCREMENTAL_PATH = os.environ.get("AML_INCREMENTAL_PATH", f"{HDFS_BASE}/training/incremental")
+COUNTER_PATH = os.environ.get("AML_COUNTER_PATH", f"{HDFS_BASE}/training/manifests/_counter.json")
+ACTIVE_MODEL_PATH = os.environ.get("AML_ACTIVE_MODEL_PATH", f"{HDFS_BASE}/model/active_model.json")
 MODEL_PATH = os.environ.get("AML_MODEL_PATH", f"{HDFS_BASE}/model/rf_aml_pipeline")
-MODEL_VERSIONS_DIR = os.environ.get(
-    "AML_MODEL_VERSIONS_DIR", f"{HDFS_BASE}/model/versions"
-)
+MODEL_VERSIONS_DIR = os.environ.get("AML_MODEL_VERSIONS_DIR", f"{HDFS_BASE}/model/versions")
 
 RETRAIN_THRESHOLD = int(os.environ.get("AML_RETRAIN_THRESHOLD", "5000"))
 POLL_INTERVAL = int(os.environ.get("AML_POLL_INTERVAL", "10"))
